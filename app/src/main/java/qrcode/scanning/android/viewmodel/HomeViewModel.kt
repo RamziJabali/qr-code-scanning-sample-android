@@ -11,5 +11,4 @@ class HomeViewModel {
     fun buttonOnClick(){
         _viewState.value = HomeViewState(isButtonClicked = true)
     }
-    
 }

@@ -1,14 +1,19 @@
 package qrcode.scanning.android
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.registerForActivityResult
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -28,6 +33,14 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel = HomeViewModel()
 
+    private val startForResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            result: ActivityResult ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val intent = result.data?.extras?.get("data") as Bitmap
+            Log.i("MainActivity", intent.toString())
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +58,7 @@ class MainActivity : AppCompatActivity() {
                 viewModel.viewState.collectLatest { viewState: HomeViewState ->
                     if (viewState.isButtonClicked) {
                         checkForPermissions(android.Manifest.permission.CAMERA, "Camera", CAMERA_RQ)
-                        dispatchTakePictureIntent()
+                        openActivityForResult()
                     }
                 }
             }
@@ -85,12 +98,7 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun dispatchTakePictureIntent() {
-        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        try {
-            startActivityForResult(takePictureIntent, IMAGE_CAPTURE_RQ)
-        } catch (e: ActivityNotFoundException) {
-            // display error state to the user
-        }
+    private fun openActivityForResult() {
+        startForResult.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE))
     }
 }
