@@ -1,4 +1,4 @@
-package qrcode.scanning.android
+package qrcode.scanning.android.views
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Button
@@ -9,16 +9,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import qrcode.scanning.android.viewmodel.HomeViewModel
 
 @Composable
-fun HomeView() {
+fun HomeView(viewModel: HomeViewModel) {
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize()
     ) {
         Button(
-            onClick = {},
+            onClick = {
+                viewModel.buttonOnClick()
+            },
             modifier = Modifier.padding(2.dp)
         ) {
             Text(
