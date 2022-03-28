@@ -1,21 +1,16 @@
 package qrcode.scanning.android
 
-import android.app.Activity
 import android.app.AlertDialog
-import android.content.Intent
-import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -38,18 +33,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val viewModel = HomeViewModel()
-    lateinit var currentPhotoPath: String
+    private lateinit var currentPhotoPath: String
 
-    private val startForResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            result: ActivityResult ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val intent = result.data?.extras?.get("data") as Bitmap
-            Log.i("MainActivity", intent.toString())
-            setContent {
-                Image(bitmap = intent.asImageBitmap(), contentDescription = "picture")
+    private val takePhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
+            if (isSuccessful) {
+                 Log.i(this.toString(), "Intent Success")
+
+            }else{
+                Log.i(this.toString(), "Intent Failure")
             }
         }
-    }
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,8 +53,16 @@ class MainActivity : AppCompatActivity() {
         }
         collectViewState()
         checkForPermissions(android.Manifest.permission.CAMERA, "Camera", CAMERA_RQ)
-        checkForPermissions(android.Manifest.permission.READ_EXTERNAL_STORAGE, "Read External Storage", READ_EXTERNAL_STORAGE_RQ)
-        checkForPermissions(android.Manifest.permission.WRITE_EXTERNAL_STORAGE, "Write External Storage", WRITE_EXTERNAL_STORAGE_RQ)
+        checkForPermissions(
+            android.Manifest.permission.READ_EXTERNAL_STORAGE,
+            "Read External Storage",
+            READ_EXTERNAL_STORAGE_RQ
+        )
+        checkForPermissions(
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            "Write External Storage",
+            WRITE_EXTERNAL_STORAGE_RQ
+        )
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -69,8 +71,7 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.viewState.collectLatest { viewState: HomeViewState ->
                     if (viewState.isButtonClicked) {
-                        checkForPermissions(android.Manifest.permission.CAMERA, "Camera", CAMERA_RQ)
-                        openActivityForResult()
+                        takePhoto()
                     }
                 }
             }
@@ -91,12 +92,19 @@ class MainActivity : AppCompatActivity() {
             )
             else -> {
                 requestPermissions(arrayOf(permission), requestCode)
-                Log.i(
-                    this.toString(),
-                    "I reached the permission asking stage"
-                )
             }
         }
+    }
+
+    private fun showDialog(permission: String, name: String, requestCode: Int) {
+        val dialog = AlertDialog.Builder(this)
+            .setMessage("Permission to access your $name is required to use this app")
+            .setTitle("Permission Required")
+            .setPositiveButton("OK") { dialog, which ->
+                PermissionUtil.request(this, arrayOf(permission), requestCode)
+            }
+            .create()
+        dialog.show()
     }
 
     @Throws(IOException::class)
@@ -114,18 +122,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showDialog(permission: String, name: String, requestCode: Int) {
-        val dialog = AlertDialog.Builder(this)
-            .setMessage("Permission to access your $name is required to use this app")
-            .setTitle("Permission Required")
-            .setPositiveButton("OK") { dialog, which ->
-                PermissionUtil.request(this, arrayOf(permission), requestCode)
-            }
-            .create()
-        dialog.show()
-    }
-
-    private fun openActivityForResult() {
-        startForResult.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE))
+    private fun takePhoto() {
+        val photoFile: File? = createImageFile()
+        photoFile?.also {
+            // You must set up file provider to expose the url to Camera app
+            val photoURI: Uri = FileProvider.getUriForFile(
+                this,
+                BuildConfig.APPLICATION_ID + ".provider",
+                it
+            )
+            takePhotoLauncher.launch(photoURI)
+        }
     }
 }
