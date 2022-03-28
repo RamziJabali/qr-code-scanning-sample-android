@@ -2,19 +2,20 @@ package qrcode.scanning.android
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.registerForActivityResult
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -23,21 +24,30 @@ import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.flow.collectLatest
+import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val CAMERA_RQ = 1
-        private const val IMAGE_CAPTURE_RQ = 2
+        private const val READ_EXTERNAL_STORAGE_RQ = 2
+        private const val WRITE_EXTERNAL_STORAGE_RQ = 3
     }
 
     private val viewModel = HomeViewModel()
+    lateinit var currentPhotoPath: String
 
     private val startForResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             result: ActivityResult ->
         if (result.resultCode == Activity.RESULT_OK) {
             val intent = result.data?.extras?.get("data") as Bitmap
             Log.i("MainActivity", intent.toString())
+            setContent {
+                Image(bitmap = intent.asImageBitmap(), contentDescription = "picture")
+            }
         }
     }
 
@@ -49,6 +59,8 @@ class MainActivity : AppCompatActivity() {
         }
         collectViewState()
         checkForPermissions(android.Manifest.permission.CAMERA, "Camera", CAMERA_RQ)
+        checkForPermissions(android.Manifest.permission.READ_EXTERNAL_STORAGE, "Read External Storage", READ_EXTERNAL_STORAGE_RQ)
+        checkForPermissions(android.Manifest.permission.WRITE_EXTERNAL_STORAGE, "Write External Storage", WRITE_EXTERNAL_STORAGE_RQ)
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -84,6 +96,21 @@ class MainActivity : AppCompatActivity() {
                     "I reached the permission asking stage"
                 )
             }
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun createImageFile(): File {
+        // Create an image file name
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val storageDir: File = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
+        return File.createTempFile(
+            "JPEG_${timeStamp}_", /* prefix */
+            ".jpg", /* suffix */
+            storageDir /* directory */
+        ).apply {
+            // Save a file: path for use with ACTION_VIEW intents
+            currentPhotoPath = absolutePath
         }
     }
 
