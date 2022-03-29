@@ -1,24 +1,30 @@
 package qrcode.scanning.android
 
 import android.app.AlertDialog
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import qrcode.scanning.android.util.PermissionUtil
 import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.flow.collectLatest
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -34,14 +40,31 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel = HomeViewModel()
     private lateinit var currentPhotoPath: String
+    private var photoURI: Uri = Uri.EMPTY
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private val takePhotoLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
             if (isSuccessful) {
-                 Log.i(this.toString(), "Intent Success")
+                Log.i(this.toString(), "Success")
+                val imageBitmap: Bitmap = if (Build.VERSION.SDK_INT < 29) {
+                    MediaStore.Images.Media.getBitmap(contentResolver, photoURI)
+                } else {
+                    val source = ImageDecoder.createSource(contentResolver, photoURI)
+                    ImageDecoder.decodeBitmap(source)
+                }
+                setContent {
+                    Image(bitmap = imageBitmap.asImageBitmap(), contentDescription = "image")
+                }
+            } else {
+                Log.i(this.toString(), "Failure")
+            }
+        }
 
-            }else{
-                Log.i(this.toString(), "Intent Failure")
+    private val takePhotoPreviewLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+            setContent {
+                Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = "photo Preview")
             }
         }
 
@@ -66,19 +89,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    private fun collectViewState() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.viewState.collectLatest { viewState: HomeViewState ->
-                    if (viewState.isButtonClicked) {
-                        takePhoto()
-                    }
-                }
-            }
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
     private fun checkForPermissions(permission: String, name: String, requestCode: Int) {
         when {
             PermissionUtil.isGranted(this, permission) -> Log.i(
@@ -92,6 +102,18 @@ class MainActivity : AppCompatActivity() {
             )
             else -> {
                 requestPermissions(arrayOf(permission), requestCode)
+            }
+        }
+    }
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun collectViewState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.viewState.collectLatest { viewState: HomeViewState ->
+                    if (viewState.isButtonClicked) {
+                        takePhoto()
+                    }
+                }
             }
         }
     }
@@ -122,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun takePhoto() {
         val photoFile: File? = createImageFile()
         photoFile?.also {
@@ -131,7 +154,13 @@ class MainActivity : AppCompatActivity() {
                 BuildConfig.APPLICATION_ID + ".provider",
                 it
             )
+            this.photoURI = photoURI
+            Log.i(this.toString(), photoURI.toString())
             takePhotoLauncher.launch(photoURI)
         }
+    }
+
+    private fun takePhotoPreview() {
+        takePhotoPreviewLauncher.launch()
     }
 }
