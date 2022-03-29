@@ -1,17 +1,14 @@
 package qrcode.scanning.android
 
-import android.app.AlertDialog
-import android.graphics.Bitmap
+import android.Manifest
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
@@ -22,7 +19,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import qrcode.scanning.android.util.PermissionUtil
 import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
 import java.io.File
@@ -47,12 +43,8 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
             if (isSuccessful) {
                 Log.i(this.toString(), "Success")
-                val imageBitmap: Bitmap = if (Build.VERSION.SDK_INT < 29) {
-                    MediaStore.Images.Media.getBitmap(contentResolver, photoURI)
-                } else {
-                    val source = ImageDecoder.createSource(contentResolver, photoURI)
-                    ImageDecoder.decodeBitmap(source)
-                }
+                val source = ImageDecoder.createSource(contentResolver, photoURI)
+                val imageBitmap = ImageDecoder.decodeBitmap(source)
                 setContent {
                     Image(bitmap = imageBitmap.asImageBitmap(), contentDescription = "image")
                 }
@@ -61,6 +53,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private val requestMultiplePermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            permissions.entries.forEach {
+                Log.i(this.toString(), "${it.key} = ${it.value}")
+            }
+        }
     private val takePhotoPreviewLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             setContent {
@@ -68,44 +66,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             HomeView(viewModel)
         }
         collectViewState()
-        checkForPermissions(android.Manifest.permission.CAMERA, "Camera", CAMERA_RQ)
-        checkForPermissions(
-            android.Manifest.permission.READ_EXTERNAL_STORAGE,
-            "Read External Storage",
-            READ_EXTERNAL_STORAGE_RQ
-        )
-        checkForPermissions(
-            android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            "Write External Storage",
-            WRITE_EXTERNAL_STORAGE_RQ
+        requestMultiplePermissions.launch(
+            arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
         )
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun checkForPermissions(permission: String, name: String, requestCode: Int) {
-        when {
-            PermissionUtil.isGranted(this, permission) -> Log.i(
-                this.toString(),
-                "Permission $name Granted"
-            )
-            shouldShowRequestPermissionRationale(permission) -> showDialog(
-                permission,
-                name,
-                requestCode
-            )
-            else -> {
-                requestPermissions(arrayOf(permission), requestCode)
-            }
-        }
-    }
-    @RequiresApi(Build.VERSION_CODES.M)
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun collectViewState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -116,17 +93,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    private fun showDialog(permission: String, name: String, requestCode: Int) {
-        val dialog = AlertDialog.Builder(this)
-            .setMessage("Permission to access your $name is required to use this app")
-            .setTitle("Permission Required")
-            .setPositiveButton("OK") { dialog, which ->
-                PermissionUtil.request(this, arrayOf(permission), requestCode)
-            }
-            .create()
-        dialog.show()
     }
 
     @Throws(IOException::class)
@@ -158,9 +124,5 @@ class MainActivity : AppCompatActivity() {
             Log.i(this.toString(), photoURI.toString())
             takePhotoLauncher.launch(photoURI)
         }
-    }
-
-    private fun takePhotoPreview() {
-        takePhotoPreviewLauncher.launch()
     }
 }
