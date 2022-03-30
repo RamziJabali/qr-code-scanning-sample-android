@@ -1,6 +1,7 @@
 package qrcode.scanning.android
 
 import android.Manifest
+import android.content.Intent
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
@@ -61,12 +62,12 @@ class MainActivity : AppCompatActivity() {
             val image: InputImage = InputImage.fromFilePath(this, photoURI)
             val result = cameraUtil.scanner.process(image)
                 .addOnSuccessListener {
-                    Log.i(this.toString(), "Success Scanning")
-                    Log.i(this.toString(), it.toString())
+                    Log.i("mainactivity", "Success Scanning")
+                    Log.i("mainactivity", it[0].displayValue!!)
                 }
                 .addOnFailureListener {
                     Log.i(this.toString(), "Failure Scanning")
-                    Log.i(this.toString(), it.toString())
+//                    Log.i(this.toString(), it.toString())
                 }
             Log.i(this.toString(), result.toString())
         }
