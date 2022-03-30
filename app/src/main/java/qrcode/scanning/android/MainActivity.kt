@@ -17,8 +17,10 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import qrcode.scanning.android.util.CameraUtil
 import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
 import java.io.File
@@ -31,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private val viewModel = HomeViewModel()
     private lateinit var currentPhotoPath: String
     private var photoURI: Uri = Uri.EMPTY
+    private val cameraUtil = CameraUtil()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,14 +56,21 @@ class MainActivity : AppCompatActivity() {
                 Log.i(this.toString(), "Failure")
                 return@registerForActivityResult
             }
-            Log.i(this.toString(), "Success")
             val source = ImageDecoder.createSource(contentResolver, photoURI)
             val imageBitmap = ImageDecoder.decodeBitmap(source)
-            setContent {
-                Image(bitmap = imageBitmap.asImageBitmap(), contentDescription = "image")
-            }
+            val image: InputImage = InputImage.fromFilePath(this, photoURI)
+            val result = cameraUtil.scanner.process(image)
+                .addOnSuccessListener {
+                    Log.i(this.toString(), "Success Scanning")
+                    Log.i(this.toString(), it.toString())
+                }
+                .addOnFailureListener {
+                    Log.i(this.toString(), "Failure Scanning")
+                    Log.i(this.toString(), it.toString())
+                }
+            Log.i(this.toString(), result.toString())
         }
-    
+
     private val requestMultiplePermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             permissions.entries.forEach {
