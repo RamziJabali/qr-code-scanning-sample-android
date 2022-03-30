@@ -4,16 +4,12 @@ import android.Manifest
 import android.content.Intent
 import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -24,7 +20,6 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import qrcode.scanning.android.util.CameraUtil
 import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
 import java.io.File
@@ -72,6 +67,9 @@ class MainActivity : AppCompatActivity() {
                 .addOnSuccessListener {
                     Log.i("mainactivity", "Success Scanning")
                     Log.i("mainactivity", it[0].displayValue!!)
+                    val openURL = Intent(Intent.ACTION_VIEW)
+                    openURL.data = Uri.parse( it[0].displayValue!!)
+                    startActivity(openURL)
                 }
                 .addOnFailureListener {
                     Log.i(this.toString(), "Failure Scanning")
