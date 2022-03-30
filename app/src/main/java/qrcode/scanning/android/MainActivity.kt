@@ -67,7 +67,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 .addOnFailureListener {
                     Log.i(this.toString(), "Failure Scanning")
-//                    Log.i(this.toString(), it.toString())
                 }
             Log.i(this.toString(), result.toString())
         }
