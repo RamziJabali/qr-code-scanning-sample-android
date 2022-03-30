@@ -28,51 +28,16 @@ import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
-    companion object {
-        private const val CAMERA_RQ = 1
-        private const val READ_EXTERNAL_STORAGE_RQ = 2
-        private const val WRITE_EXTERNAL_STORAGE_RQ = 3
-    }
-
     private val viewModel = HomeViewModel()
     private lateinit var currentPhotoPath: String
     private var photoURI: Uri = Uri.EMPTY
 
-    @RequiresApi(Build.VERSION_CODES.P)
-    private val takePhotoLauncher =
-        registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
-            if (isSuccessful) {
-                Log.i(this.toString(), "Success")
-                val source = ImageDecoder.createSource(contentResolver, photoURI)
-                val imageBitmap = ImageDecoder.decodeBitmap(source)
-                setContent {
-                    Image(bitmap = imageBitmap.asImageBitmap(), contentDescription = "image")
-                }
-            } else {
-                Log.i(this.toString(), "Failure")
-            }
-        }
-
-    private val requestMultiplePermissions =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            permissions.entries.forEach {
-                Log.i(this.toString(), "${it.key} = ${it.value}")
-            }
-        }
-    private val takePhotoPreviewLauncher =
-        registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-            setContent {
-                Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = "photo Preview")
-            }
-        }
-
-    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             HomeView(viewModel)
         }
-        collectViewState()
+        setupViewModel()
         requestMultiplePermissions.launch(
             arrayOf(
                 Manifest.permission.CAMERA,
@@ -82,8 +47,28 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    @RequiresApi(Build.VERSION_CODES.P)
-    private fun collectViewState() {
+    private val takePhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
+            if (!isSuccessful) {
+                Log.i(this.toString(), "Failure")
+                return@registerForActivityResult
+            }
+            Log.i(this.toString(), "Success")
+            val source = ImageDecoder.createSource(contentResolver, photoURI)
+            val imageBitmap = ImageDecoder.decodeBitmap(source)
+            setContent {
+                Image(bitmap = imageBitmap.asImageBitmap(), contentDescription = "image")
+            }
+        }
+    
+    private val requestMultiplePermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            permissions.entries.forEach {
+                Log.i(this.toString(), "${it.key} = ${it.value}")
+            }
+        }
+
+    private fun setupViewModel() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.viewState.collectLatest { viewState: HomeViewState ->
@@ -93,6 +78,19 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun takePhoto() {
+        val photoFile: File = createImageFile()
+        // You must set up file provider to expose the url to Camera app
+        val photoURI: Uri = FileProvider.getUriForFile(
+            this,
+            BuildConfig.APPLICATION_ID + ".provider",
+            photoFile
+        )
+        this.photoURI = photoURI
+        Log.i(this.toString(), photoURI.toString())
+        takePhotoLauncher.launch(photoURI)
     }
 
     @Throws(IOException::class)
@@ -107,22 +105,6 @@ class MainActivity : AppCompatActivity() {
         ).apply {
             // Save a file: path for use with ACTION_VIEW intents
             currentPhotoPath = absolutePath
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.P)
-    private fun takePhoto() {
-        val photoFile: File? = createImageFile()
-        photoFile?.also {
-            // You must set up file provider to expose the url to Camera app
-            val photoURI: Uri = FileProvider.getUriForFile(
-                this,
-                BuildConfig.APPLICATION_ID + ".provider",
-                it
-            )
-            this.photoURI = photoURI
-            Log.i(this.toString(), photoURI.toString())
-            takePhotoLauncher.launch(photoURI)
         }
     }
 }
