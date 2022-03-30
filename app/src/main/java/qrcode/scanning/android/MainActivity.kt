@@ -18,6 +18,9 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -34,7 +37,12 @@ class MainActivity : AppCompatActivity() {
     private val viewModel = HomeViewModel()
     private lateinit var currentPhotoPath: String
     private var photoURI: Uri = Uri.EMPTY
-    private val cameraUtil = CameraUtil()
+
+    private val options = BarcodeScannerOptions.Builder()
+        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+        .build()
+
+    private val scanner = BarcodeScanning.getClient(options)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,7 +68,7 @@ class MainActivity : AppCompatActivity() {
             val source = ImageDecoder.createSource(contentResolver, photoURI)
             val imageBitmap = ImageDecoder.decodeBitmap(source)
             val image: InputImage = InputImage.fromFilePath(this, photoURI)
-            val result = cameraUtil.scanner.process(image)
+            val result = scanner.process(image)
                 .addOnSuccessListener {
                     Log.i("mainactivity", "Success Scanning")
                     Log.i("mainactivity", it[0].displayValue!!)
