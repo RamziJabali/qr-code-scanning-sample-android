@@ -11,7 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
-import androidx.core.view.accessibility.AccessibilityEventCompat.setAction
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -19,10 +18,6 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import io.github.g00fy2.quickie.QRResult
-import io.github.g00fy2.quickie.QRResult.QRSuccess
-import io.github.g00fy2.quickie.ScanQRCode
-import io.github.g00fy2.quickie.content.QRContent
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import qrcode.scanning.android.viewmodel.HomeViewModel
@@ -35,6 +30,14 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private val viewModel = HomeViewModel()
+    private lateinit var currentPhotoPath: String
+    private var photoURI: Uri = Uri.EMPTY
+
+    private val options = BarcodeScannerOptions.Builder()
+        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+        .build()
+
+    private val scanner = BarcodeScanning.getClient(options)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,24 +55,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val takePhotoLauncher =
-        registerForActivityResult(ScanQRCode(), ::handleResult)
-
-    private fun handleResult(result: QRResult) {
-        when (result) {
-            is QRSuccess -> Log.i(this.toString(), result.content.rawValue)
-            QRResult.QRUserCanceled -> Log.i(this.toString(), "User canceled")
-            QRResult.QRMissingPermission -> Log.i(this.toString(), "Missing permission")
-            is QRResult.QRError -> Log.i(
-                this.toString(),
-                "${result.exception.javaClass.simpleName}: ${result.exception.localizedMessage}"
-            )
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
+            if (!isSuccessful) {
+                Log.i(this.toString(), "Failure")
+                return@registerForActivityResult
+            }
+            val source = ImageDecoder.createSource(contentResolver, photoURI)
+            val imageBitmap = ImageDecoder.decodeBitmap(source)
+            val image: InputImage = InputImage.fromFilePath(this, photoURI)
+            val result = scanner.process(image)
+                .addOnSuccessListener {
+                    Log.i("mainactivity", "Success Scanning")
+                    Log.i("mainactivity", it[0].displayValue!!)
+                    val openURL = Intent(Intent.ACTION_VIEW)
+                    openURL.data = Uri.parse( it[0].displayValue!!)
+                    startActivity(openURL)
+                }
+                .addOnFailureListener {
+                    Log.i(this.toString(), "Failure Scanning")
+                }
+            Log.i(this.toString(), result.toString())
         }
-        if (result is QRSuccess && result.content is QRContent.Url) {
-            val openURL = Intent(Intent.ACTION_VIEW)
-            openURL.data = Uri.parse((result.content as QRContent.Url).url)
-            startActivity(openURL)
-        }
-    }
 
     private val requestMultiplePermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -83,10 +89,38 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.viewState.collectLatest { viewState: HomeViewState ->
                     if (viewState.isButtonClicked) {
-                        takePhotoLauncher.launch(null)
+                        takePhoto()
                     }
                 }
             }
+        }
+    }
+
+    private fun takePhoto() {
+        val photoFile: File = createImageFile()
+        // You must set up file provider to expose the url to Camera app
+        val photoURI: Uri = FileProvider.getUriForFile(
+            this,
+            BuildConfig.APPLICATION_ID + ".provider",
+            photoFile
+        )
+        this.photoURI = photoURI
+        Log.i(this.toString(), photoURI.toString())
+        takePhotoLauncher.launch(photoURI)
+    }
+
+    @Throws(IOException::class)
+    private fun createImageFile(): File {
+        // Create an image file name
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val storageDir: File = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
+        return File.createTempFile(
+            "JPEG_${timeStamp}_", /* prefix */
+            ".jpg", /* suffix */
+            storageDir /* directory */
+        ).apply {
+            // Save a file: path for use with ACTION_VIEW intents
+            currentPhotoPath = absolutePath
         }
     }
 }
