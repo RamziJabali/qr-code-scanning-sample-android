@@ -70,6 +70,5 @@ dependencies {
     //bundled version of MLKit
     implementation 'com.google.mlkit:barcode-scanning:17.0.2'
 
-    implementation 'com.github.bumptech.glide:glide:4.13.0'
-    annotationProcessor 'com.github.bumptech.glide:compiler:4.13.0'
+    implementation("io.github.g00fy2.quickie:quickie-bundled:1.4.0")
 }
