@@ -10,6 +10,12 @@ import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.camera2.Camera2Config
+import androidx.camera.core.AspectRatio.RATIO_16_9
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraXConfig
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCapture.FLASH_MODE_OFF
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -22,14 +28,25 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
+import qrcode.scanning.android.views.Camera
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
+
 
     private val viewModel = HomeViewModel()
+    private val imageCapture = ImageCapture.Builder()
+        .setFlashMode(FLASH_MODE_OFF)
+        .setTargetAspectRatio(RATIO_16_9)
+        .build()
+    private lateinit var outputDirectory: File
+    private lateinit var cameraExecutor: ExecutorService
+
     private lateinit var currentPhotoPath: String
     private var photoURI: Uri = Uri.EMPTY
 
@@ -52,6 +69,20 @@ class MainActivity : AppCompatActivity() {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
         )
+        outputDirectory = createImageFile()
+        cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraExecutor.shutdown()
+    }
+
+    override fun getCameraXConfig(): CameraXConfig {
+        return CameraXConfig.Builder.fromConfig(Camera2Config.defaultConfig())
+            .setAvailableCamerasLimiter(CameraSelector.DEFAULT_BACK_CAMERA)
+            .setMinimumLoggingLevel(Log.INFO)
+            .build()
     }
 
     private val takePhotoLauncher =
@@ -68,7 +99,7 @@ class MainActivity : AppCompatActivity() {
                     Log.i("mainactivity", "Success Scanning")
                     Log.i("mainactivity", it[0].displayValue!!)
                     val openURL = Intent(Intent.ACTION_VIEW)
-                    openURL.data = Uri.parse( it[0].displayValue!!)
+                    openURL.data = Uri.parse(it[0].displayValue!!)
                     startActivity(openURL)
                 }
                 .addOnFailureListener {
@@ -89,7 +120,9 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.viewState.collectLatest { viewState: HomeViewState ->
                     if (viewState.isButtonClicked) {
-                        takePhoto()
+                        setContent{
+                            Camera()
+                        }
                     }
                 }
             }
