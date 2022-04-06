@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -77,6 +78,7 @@ fun CameraIcon(takePicture: () -> Unit) {
             painter = painterResource(id = R.drawable.ic_photo_camera_white_24dp),
             contentDescription = "Camera Icon",
             modifier = Modifier.size(80.dp),
+            tint = Color.White
         )
     }
 }
