@@ -118,7 +118,7 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val msg = "Photo capture succeeded: $outputFileResults.savedUri"
+                    val msg = "Photo capture succeeded: ${outputFileResults.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.i("mainactivity", "Success Saving Picture")
                     val image: InputImage =
@@ -134,6 +134,7 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
                                 openURL.data = Uri.parse(it[0].displayValue!!)
                                 startActivity(openURL)
                             }
+                            deleteGalleryImage(outputFileResults.savedUri!!)
                         }
                         .addOnFailureListener {
                             Log.i(this.toString(), "Failure Scanning")
@@ -149,6 +150,10 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
 
             }
         )
+    }
+
+    private fun deleteGalleryImage(uri: Uri) {
+        this.contentResolver.delete(uri, null, null)
     }
 
     @Throws(IOException::class)
