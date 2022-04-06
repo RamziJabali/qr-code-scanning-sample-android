@@ -2,6 +2,7 @@ package qrcode.scanning.android.views
 
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -21,7 +22,10 @@ import androidx.core.content.ContextCompat
 import qrcode.scanning.android.R
 
 @Composable
-fun Camera() {
+fun Camera(
+    takePicture: () -> Unit,
+    imageCapture: ImageCapture
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
@@ -46,7 +50,8 @@ fun Camera() {
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
-                    preview
+                    preview,
+                    imageCapture
                 )
             }, executor)
             previewView
@@ -58,19 +63,20 @@ fun Camera() {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.Bottom
     ) {
-        CameraIcon()
+        CameraIcon(takePicture)
     }
 }
 
 @Composable
-fun CameraIcon() {
-    IconButton(onClick = {
-
-    }) {
+fun CameraIcon(takePicture: () -> Unit) {
+    IconButton(
+        onClick = takePicture,
+        modifier = Modifier.size(80.dp),
+    ) {
         Icon(
-            painter = painterResource(id = R.drawable.ic_photo_camera_black_24dp),
+            painter = painterResource(id = R.drawable.ic_photo_camera_white_24dp),
             contentDescription = "Camera Icon",
-            modifier = Modifier.size(80.dp)
+            modifier = Modifier.size(80.dp),
         )
     }
 }

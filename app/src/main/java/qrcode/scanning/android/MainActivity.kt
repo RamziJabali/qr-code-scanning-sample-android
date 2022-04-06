@@ -1,22 +1,24 @@
 package qrcode.scanning.android
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Intent
-import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.camera2.Camera2Config
-import androidx.camera.core.AspectRatio.RATIO_16_9
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraXConfig
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCapture.FLASH_MODE_OFF
-import androidx.core.content.FileProvider
+import androidx.camera.core.ImageCaptureException
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -31,21 +33,14 @@ import qrcode.scanning.android.views.HomeView
 import qrcode.scanning.android.views.Camera
 import java.io.File
 import java.io.IOException
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
 
-
     private val viewModel = HomeViewModel()
-    private val imageCapture = ImageCapture.Builder()
-        .setFlashMode(FLASH_MODE_OFF)
-        .setTargetAspectRatio(RATIO_16_9)
-        .build()
-    private lateinit var outputDirectory: File
-    private lateinit var cameraExecutor: ExecutorService
+    private val imageCapture = ImageCapture.Builder().build()
 
     private lateinit var currentPhotoPath: String
     private var photoURI: Uri = Uri.EMPTY
@@ -66,16 +61,8 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
             arrayOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
         )
-        outputDirectory = createImageFile()
-        cameraExecutor = Executors.newSingleThreadExecutor()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        cameraExecutor.shutdown()
     }
 
     override fun getCameraXConfig(): CameraXConfig {
@@ -84,29 +71,6 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
             .setMinimumLoggingLevel(Log.INFO)
             .build()
     }
-
-    private val takePhotoLauncher =
-        registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccessful ->
-            if (!isSuccessful) {
-                Log.i(this.toString(), "Failure")
-                return@registerForActivityResult
-            }
-            val source = ImageDecoder.createSource(contentResolver, photoURI)
-            val imageBitmap = ImageDecoder.decodeBitmap(source)
-            val image: InputImage = InputImage.fromFilePath(this, photoURI)
-            val result = scanner.process(image)
-                .addOnSuccessListener {
-                    Log.i("mainactivity", "Success Scanning")
-                    Log.i("mainactivity", it[0].displayValue!!)
-                    val openURL = Intent(Intent.ACTION_VIEW)
-                    openURL.data = Uri.parse(it[0].displayValue!!)
-                    startActivity(openURL)
-                }
-                .addOnFailureListener {
-                    Log.i(this.toString(), "Failure Scanning")
-                }
-            Log.i(this.toString(), result.toString())
-        }
 
     private val requestMultiplePermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -120,8 +84,9 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.viewState.collectLatest { viewState: HomeViewState ->
                     if (viewState.isButtonClicked) {
-                        setContent{
-                            Camera()
+                        setContent {
+                            Camera(imageCapture = imageCapture,
+                                takePicture = { takePicture() })
                         }
                     }
                 }
@@ -129,17 +94,61 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
         }
     }
 
-    private fun takePhoto() {
-        val photoFile: File = createImageFile()
-        // You must set up file provider to expose the url to Camera app
-        val photoURI: Uri = FileProvider.getUriForFile(
-            this,
-            BuildConfig.APPLICATION_ID + ".provider",
-            photoFile
+    private fun takePicture() {
+        val imageCapture = imageCapture ?: return
+        val name = SimpleDateFormat(DateFormat.FULL.toString(), Locale.US)
+            .format(System.currentTimeMillis())
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
+            }
+        }
+        val outputOptions = ImageCapture.OutputFileOptions
+            .Builder(
+                contentResolver,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues
+            )
+            .build()
+
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    val msg = "Photo capture succeeded: $outputFileResults.savedUri"
+                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                    Log.i("mainactivity", "Success Saving Picture")
+                    val image: InputImage =
+                        InputImage.fromFilePath(this@MainActivity, outputFileResults.savedUri!!)
+                    scanner.process(image)
+                        .addOnSuccessListener {
+                            Log.i("mainactivity", "Success Scanning")
+                            if (it.isNotEmpty()) {
+                                setContent {
+                                    HomeView(viewModel = viewModel)
+                                }
+                                val openURL = Intent(Intent.ACTION_VIEW)
+                                openURL.data = Uri.parse(it[0].displayValue!!)
+                                startActivity(openURL)
+                            }
+                        }
+                        .addOnFailureListener {
+                            Log.i(this.toString(), "Failure Scanning")
+                            setContent {
+                                HomeView(viewModel = viewModel)
+                            }
+                        }
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    Log.i("mainactivity", "Error Saving Picture")
+                }
+
+            }
         )
-        this.photoURI = photoURI
-        Log.i(this.toString(), photoURI.toString())
-        takePhotoLauncher.launch(photoURI)
     }
 
     @Throws(IOException::class)
