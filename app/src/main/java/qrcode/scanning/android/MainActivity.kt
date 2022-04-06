@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
@@ -31,8 +30,6 @@ import kotlinx.coroutines.launch
 import qrcode.scanning.android.viewmodel.HomeViewModel
 import qrcode.scanning.android.views.HomeView
 import qrcode.scanning.android.views.Camera
-import java.io.File
-import java.io.IOException
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -41,15 +38,11 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
 
     private val viewModel = HomeViewModel()
     private val imageCapture = ImageCapture.Builder().build()
-
-    private lateinit var currentPhotoPath: String
-    private var photoURI: Uri = Uri.EMPTY
-
-    private val options = BarcodeScannerOptions.Builder()
+    private val barcodeScanningOptions = BarcodeScannerOptions.Builder()
         .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
         .build()
 
-    private val scanner = BarcodeScanning.getClient(options)
+    private val scanner = BarcodeScanning.getClient(barcodeScanningOptions)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -154,20 +147,5 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
 
     private fun deleteGalleryImage(uri: Uri) {
         this.contentResolver.delete(uri, null, null)
-    }
-
-    @Throws(IOException::class)
-    private fun createImageFile(): File {
-        // Create an image file name
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val storageDir: File = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
-        return File.createTempFile(
-            "JPEG_${timeStamp}_", /* prefix */
-            ".jpg", /* suffix */
-            storageDir /* directory */
-        ).apply {
-            // Save a file: path for use with ACTION_VIEW intents
-            currentPhotoPath = absolutePath
-        }
     }
 }
