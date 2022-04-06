@@ -120,14 +120,15 @@ class MainActivity : AppCompatActivity(), CameraXConfig.Provider {
                         .addOnSuccessListener {
                             Log.i("mainactivity", "Success Scanning")
                             if (it.isNotEmpty()) {
-                                setContent {
-                                    HomeView(viewModel = viewModel)
-                                }
                                 val openURL = Intent(Intent.ACTION_VIEW)
                                 openURL.data = Uri.parse(it[0].displayValue!!)
                                 startActivity(openURL)
                             }
                             deleteGalleryImage(outputFileResults.savedUri!!)
+                            viewModel.resetViewState()
+                            setContent {
+                                HomeView(viewModel = viewModel)
+                            }
                         }
                         .addOnFailureListener {
                             Log.i(this.toString(), "Failure Scanning")

@@ -28,4 +28,7 @@ class HomeViewModel {
         _viewState.value = HomeViewState(isButtonClicked = true)
     }
 
+    fun resetViewState(){
+        _viewState.value = HomeViewState()
+    }
 }
