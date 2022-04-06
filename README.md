@@ -9,7 +9,9 @@ https://user-images.githubusercontent.com/18749441/162092742-d452260f-2e51-4a1c-
 
 
 Libraries:
+- [CameraX](https://developer.android.com/training/camerax)
 - [MLKit](https://developers.google.com/ml-kit/vision/barcode-scanning/android)
+
 
 References:
 - [MLKit Samples](https://github.com/googlesamples/mlkit/tree/master/android/vision-quickstart)
